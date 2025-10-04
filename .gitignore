@@ -1,0 +1,33 @@
+# Ignorar entorno virtual
+venv/
+ENV/
+env/
+.venv/
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de logs
+*.log
+
+# Configuración de IDEs
+.vscode/
+.idea/
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de compilación
+*.so
+*.dll
+*.exe
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Archivos de pruebas
+.coverage
+.pytest_cache/
