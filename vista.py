@@ -1,4 +1,3 @@
-vista.py
 import cv2
 import numpy as np
 
@@ -67,5 +66,5 @@ class Vista:
 
     def mostrar(self, frame):
         """Muestra el frame en pantalla"""
-        cv2.namedWindow("Juego de Patrones - Terapia de Rehabilitacion", cv2.WINDOW_NORMAL)
-        cv2.imshow("Juego de Patrones - Terapia de Rehabilitacion", frame)
+        cv2.namedWindow("Music - Therapy", cv2.WINDOW_NORMAL)
+        cv2.imshow("Music - Therapy", frame)

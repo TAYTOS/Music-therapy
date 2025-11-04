@@ -1,4 +1,3 @@
-controlador.py
 import cv2
 import numpy as np
 import time
@@ -8,7 +7,7 @@ from vista import Vista
 
 def main():
     # Configuración de la cámara IP
-    cap = cv2.VideoCapture("http://192.168.1.37:4747/video")
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("No se pudo acceder a la camara IP.")
         return
