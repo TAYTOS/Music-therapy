@@ -61,7 +61,7 @@ El proyecto está estructurado bajo el patrón **MVC (Modelo–Vista–Controlad
 * Paquetes:
 
   ```bash
-  pip install opencv-python mediapipe pygame cvzone
+  pip install -r requirements.txt
   ```
 
 ### ▶️ Ejecución
