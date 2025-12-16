@@ -76,7 +76,7 @@ class Vista:
 
         cv2.putText(
             frame,
-            f"Tiempo: {tiempo_restante}s | Beats: {beats_restantes}",
+            f"Tiempo: {tiempo_restante}s",
             (20, 75),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,
@@ -90,21 +90,13 @@ class Vista:
             if precision_ritmo >= 80
             else (0, 255, 255) if precision_ritmo >= 60 else (0, 0, 255)
         )
-        cv2.putText(
-            frame,
-            f"Ritmo: {precision_ritmo}%",
-            (w - 200, 75),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            color_precision,
-            2,
-        )
+        
 
         # FILA 3: Info musical y max combo
         color_musica = (0, 255, 0) if musica_activa else (100, 100, 100)
         cv2.putText(
             frame,
-            f"BPM: {bpm} | Max Combo: {max_combo}",
+            f"Max Combo: {max_combo}",
             (20, 105),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
@@ -115,7 +107,7 @@ class Vista:
         # Instrucciones según el estado
         instrucciones = {
             "esperando": "Coloca el PUÑO en el circulo VERDE para comenzar a bailar",
-            "trazando": "Mueve tu mano AL RITMO de los beats - NO pierdas 3 beats seguidos",
+            "trazando": "Mueve tu mano AL RITMO de los beats - NO pierdas 3 beats",
             "completado": "¡PERFECTO! Bailaste con ritmo",
             "fallido": "Tiempo agotado - Intenta otra vez",
             "fuera_ritmo": "¡Perdiste el ritmo! Nuevo patron",
@@ -226,5 +218,5 @@ class Vista:
 
     def mostrar(self, frame):
         """Muestra el frame en pantalla"""
-        cv2.namedWindow("Terapia de Rehabilitacion-Music Therapy", cv2.WINDOW_NORMAL)
-        cv2.imshow("Terapia de Rehabilitacion-Music Therapy", frame)
+        cv2.namedWindow("Terapia de Rehabilitacion", cv2.WINDOW_NORMAL)
+        cv2.imshow("Terapia de Rehabilitacion", frame)

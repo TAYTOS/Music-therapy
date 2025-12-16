@@ -8,8 +8,7 @@ from vista import Vista
 
 
 def main():
-    # Configuración de la cámara IP
-    cap = cv2.VideoCapture("http://192.168.1.37:4747/video")
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("No se pudo acceder a la cámara IP.")
         return
@@ -17,26 +16,23 @@ def main():
     cam = Camara()
     vista = Vista()
     generador = GeneradorPatrones()
-    musica = GestorMusica()  # Inicializar gestor de música
+    musica = GestorMusica()
 
     score = 0
-    rastro_usuario = []
-
-    # Estado del juego
     estado = "esperando"
 
-    # Variables de control
+    rastro_usuario = []
     posicion_anterior = None
-    puntos_minimos_requeridos = 30
+
+    combo_ritmo = 0
+    max_combo = 0
+    fallos_ritmo = 0
+    MAX_FALLOS_RITMO = 3
+
+    puntos_minimos = 30
     mensaje_temporal = ""
     tiempo_mensaje = 0
 
-    # Control de movimiento y ritmo
-    hay_movimiento_actual = False
-    combo_ritmo = 0  # Contador de beats consecutivos en ritmo
-    max_combo = 0
-
-    # Inicializar música y patrón
     musica.reiniciar_compas()
 
     while True:
@@ -44,183 +40,117 @@ def main():
         if frame is None:
             continue
 
-        # Actualizar música y detectar beats
         hay_beat = musica.actualizar()
         progreso_beat = musica.obtener_progreso_beat()
-        en_ventana_sincronizacion = musica.esta_en_ventana_sincronizacion()
+        en_ventana = musica.esta_en_ventana_sincronizacion()
 
-        # Detectar si hay movimiento (cambio de posición significativo)
-        hay_movimiento_actual = False
-        if is_fist and pos[0] is not None and posicion_anterior is not None:
-            distancia_movimiento = np.linalg.norm(
-                np.array(pos) - np.array(posicion_anterior)
-            )
-            hay_movimiento_actual = distancia_movimiento > 8  # Movimiento mín de 8px
-
-        # Verificar sincronización con el ritmo
-        en_sincronizacion, perdio_ritmo = musica.verificar_sincronizacion(
-            hay_movimiento_actual
+        hay_movimiento = (
+            is_fist
+            and pos[0] is not None
+            and posicion_anterior is not None
+            and np.linalg.norm(np.array(pos) - np.array(posicion_anterior)) > 8
         )
 
-        # Actualizar combo
-        if en_sincronizacion:
+        en_ritmo, fallo_instantaneo = musica.verificar_sincronizacion(hay_movimiento)
+
+        # ================= RITMO (UN SOLO LUGAR) =================
+        perdio_ritmo = False
+
+        if en_ritmo:
             combo_ritmo += 1
             max_combo = max(max_combo, combo_ritmo)
-        elif perdio_ritmo:
-            combo_ritmo = 0
+            fallos_ritmo = max(0, fallos_ritmo - 1)
+        elif fallo_instantaneo:
+            fallos_ritmo += 1
+            combo_ritmo = max(0, combo_ritmo - 1)
+            if fallos_ritmo >= MAX_FALLOS_RITMO:
+                perdio_ritmo = True
 
-        # Obtener tiempo restante según el ritmo musical
         tiempo_restante = int(musica.obtener_tiempo_restante_patron())
         beats_restantes = musica.obtener_beats_restantes()
 
-        # LÓGICA DE ESTADOS
-        if estado == "esperando":
-            rastro_usuario = []
-            combo_ritmo = 0
+        # ================= ESTADOS =================
 
-            # Verificar si está en el inicio con puño cerrado
+        if estado == "esperando":
+            rastro_usuario.clear()
+            combo_ritmo = 0
+            fallos_ritmo = 0
+
             if is_fist and pos[0] is not None:
-                distancia_inicio = generador.calcular_distancia_a_inicio(pos)
-                if distancia_inicio < 50:
+                if generador.calcular_distancia_a_inicio(pos) < 50:
                     estado = "trazando"
-                    rastro_usuario = [pos]
-                    mensaje_temporal = "¡A bailar! Sigue el ritmo"
-                    tiempo_mensaje = time.time()
+                    rastro_usuario.append(pos)
                     musica.reiniciar_compas()
                     musica.reiniciar_estadisticas()
 
         elif estado == "trazando":
-            # Solo agregar puntos si el puño está cerrado
             if is_fist and pos[0] is not None:
-                if (
-                    len(rastro_usuario) == 0
-                    or np.linalg.norm(np.array(pos) - np.array(rastro_usuario[-1])) > 5
-                ):
+                if not rastro_usuario or np.linalg.norm(
+                    np.array(pos) - np.array(rastro_usuario[-1])
+                ) > 5:
                     rastro_usuario.append(pos)
 
-            # CRÍTICO: Si pierde el ritmo (3 beats), cambiar patrón
             if perdio_ritmo:
                 estado = "fuera_ritmo"
                 mensaje_temporal = "¡Perdiste el ritmo!"
                 tiempo_mensaje = time.time()
                 musica.reproducir_error()
 
-            # Calcular progreso si hay suficientes puntos
             if len(rastro_usuario) >= 10:
-                cobertura_total, llegado_al_final, porcentaje_patron = (
+                cobertura, llegado_final, _ = (
                     generador.calcular_progreso_detallado(rastro_usuario)
                 )
 
-                # Mostrar progreso y sincronización
-                cv2.putText(
-                    frame,
-                    f"Cobertura: {int(cobertura_total*100)}%",
-                    (10, frame.shape[0] - 140),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 0),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    f"Patron: {int(porcentaje_patron)}%",
-                    (10, frame.shape[0] - 110),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (100, 200, 255),
-                    2,
-                )
-
-                # COMPLETAR: Cobertura + final + mínimo de puntos
                 if (
-                    cobertura_total >= 0.75
-                    and llegado_al_final
-                    and len(rastro_usuario) >= puntos_minimos_requeridos
+                    cobertura >= 0.75
+                    and llegado_final
+                    and len(rastro_usuario) >= puntos_minimos
                 ):
-
                     estado = "completado"
-                    # Bonificación por combo y precisión
-                    puntos_base = int(cobertura_total * 10)
-                    # Hasta +20 por combo
-                    bonus_combo = min(combo_ritmo * 2, 20)
-                    precision_ritmo = musica.obtener_precision_ritmo()
-                    # Hasta +10 por ritmo perfecto
-                    bonus_ritmo = int(precision_ritmo / 10)
 
-                    puntos_ganados = puntos_base + bonus_combo + bonus_ritmo
-                    score += puntos_ganados
+                    puntos = int(cobertura * 10)
+                    puntos += min(combo_ritmo * 2, 20)
+                    puntos += int(musica.obtener_precision_ritmo() / 10)
 
-                    mensaje_temporal = (
-                        f"¡PERFECTO! +{puntos_ganados} pts (Combo x{combo_ritmo})"
-                    )
+                    score += puntos
+                    mensaje_temporal = f"¡PERFECTO! +{puntos} pts"
                     tiempo_mensaje = time.time()
                     musica.reproducir_exito()
 
-            # Si llega al final del compás sin completar
-            if musica.es_momento_de_nuevo_patron():
-                if estado == "trazando":
-                    estado = "fallido"
-                    mensaje_temporal = "Tiempo agotado"
-                    tiempo_mensaje = time.time()
+            if musica.es_momento_de_nuevo_patron() and estado == "trazando":
+                estado = "fallido"
+                mensaje_temporal = "Tiempo agotado"
+                tiempo_mensaje = time.time()
 
-        elif estado == "completado" or estado == "fallido" or estado == "fuera_ritmo":
-            # Esperar al final del compás para cambiar de patrón
-            if musica.es_momento_de_nuevo_patron():
-                generador.generar_patron()
-                rastro_usuario = []
-                estado = "esperando"
-                musica.reiniciar_compas()
-                combo_ritmo = 0
+        elif estado in ("completado", "fallido", "fuera_ritmo"):
+            generador.generar_patron()
+            musica.reiniciar_compas()
+            rastro_usuario.clear()
+            fallos_ritmo = 0
+            estado = "esperando"
 
-        # DIBUJO EN PANTALLA
-        # Dibujar el rastro del usuario
-        if len(rastro_usuario) > 1:
-            for i in range(1, len(rastro_usuario)):
-                alpha = min(255, 100 + (i * 155 // len(rastro_usuario)))
-                # Color según sincronización
-                if en_sincronizacion:
-                    color = (0, alpha, 0)  # Verde: en ritmo
-                elif en_ventana_sincronizacion:
-                    color = (0, alpha, alpha)  # Cian: cerca del beat
-                else:
-                    # Rojo-azul: fuera de ritmo
-                    color = (0, int(alpha * 0.5), alpha)
-                grosor = 3 if i == len(rastro_usuario) - 1 else 2
-                cv2.line(frame, rastro_usuario[i - 1], rastro_usuario[i], color, grosor)
+        # ================= DIBUJO =================
 
-        # Dibujar la posición actual con indicador de ritmo
-        if pos[0] is not None:
-            if is_fist:
-                # Color según sincronización
-                if en_ventana_sincronizacion:
-                    color_puno = (0, 255, 255) if en_sincronizacion else (0, 200, 255)
-                    radio = 25 if hay_beat else 20
-                else:
-                    color_puno = (0, 150, 255)
-                    radio = 18
-
-                cv2.circle(frame, pos, radio, color_puno, -1)
-                cv2.circle(frame, pos, radio + 3, (255, 255, 255), 3)
-
-                # Anillo de sincronización
-                if en_ventana_sincronizacion:
-                    cv2.circle(frame, pos, radio + 8, (0, 255, 0), 2)
-            else:
-                cv2.circle(frame, pos, 12, (255, 0, 0), -1)
-                cv2.circle(frame, pos, 16, (255, 255, 255), 2)
-
-        # Dibujar el patrón objetivo
         frame = generador.dibujar_patron_en_frame(
             frame, rastro_usuario if estado == "trazando" else []
         )
 
-        # Dibujar indicador visual de beat mejorado
+        # Mano (círculo restaurado)
+        if pos[0] is not None:
+            if is_fist:
+                color = (0, 255, 255) if en_ventana else (0, 150, 255)
+                radio = 25 if hay_beat else 20
+                cv2.circle(frame, pos, radio, color, -1)
+                cv2.circle(frame, pos, radio + 3, (255, 255, 255), 3)
+            else:
+                cv2.circle(frame, pos, 12, (255, 0, 0), -1)
+                cv2.circle(frame, pos, 16, (255, 255, 255), 2)
+
         if musica.musica_activa:
             frame = vista.dibujar_indicador_beat(
-                frame, progreso_beat, hay_beat, en_sincronizacion, combo_ritmo
+                frame, progreso_beat, hay_beat, en_ritmo, combo_ritmo
             )
 
-        # Dibujar interfaz con información de ritmo
         frame = vista.dibujar_interfaz(
             frame,
             score,
@@ -235,66 +165,19 @@ def main():
             musica.obtener_precision_ritmo(),
         )
 
-        # Mostrar mensaje temporal
-        if time.time() - tiempo_mensaje < 2 and mensaje_temporal:
-            h, w, _ = frame.shape
-            cv2.rectangle(
-                frame,
-                (w // 2 - 300, h // 2 - 60),
-                (w // 2 + 300, h // 2 + 60),
-                (0, 0, 0),
-                -1,
-            )
-
-            if estado == "completado":
-                color_borde = (0, 255, 0)
-            elif estado == "fuera_ritmo":
-                color_borde = (0, 100, 255)
-            else:
-                color_borde = (0, 0, 255)
-
-            cv2.rectangle(
-                frame,
-                (w // 2 - 300, h // 2 - 60),
-                (w // 2 + 300, h // 2 + 60),
-                color_borde,
-                4,
-            )
-
-            texto_size = cv2.getTextSize(
-                mensaje_temporal, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2
-            )[0]
-            texto_x = w // 2 - texto_size[0] // 2
-            cv2.putText(
-                frame,
-                mensaje_temporal,
-                (texto_x, h // 2 + 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.9,
-                (255, 255, 255),
-                2,
-            )
-
-        # Mostrar el frame
         vista.mostrar(frame)
 
-        # Guardar posición anterior para detectar movimiento
         if pos[0] is not None:
             posicion_anterior = pos
 
-        # Controles de teclado
         key = cv2.waitKey(1) & 0xFF
-
         if key == ord(" "):
             break
-        elif key == ord("m") or key == ord("M"):
-            if musica.musica_activa:
-                musica.desactivar_musica()
-            else:
-                musica.activar_musica()
-        elif key == ord("+") or key == ord("="):
+        elif key in (ord("m"), ord("M")):
+            musica.desactivar_musica() if musica.musica_activa else musica.activar_musica()
+        elif key in (ord("+"), ord("=")):
             musica.cambiar_bpm(musica.bpm + 10)
-        elif key == ord("-") or key == ord("_"):
+        elif key in (ord("-"), ord("_")):
             musica.cambiar_bpm(musica.bpm - 10)
 
     cap.release()

@@ -72,7 +72,7 @@ class Camara:
                 if is_fist:
                     cv2.putText(
                         frame,
-                        "PUÑO CERRADO",
+                        " ",
                         (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.8,
@@ -82,7 +82,7 @@ class Camara:
                 else:
                     cv2.putText(
                         frame,
-                        "Cierra el puño",
+                        " ",
                         (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.8,
