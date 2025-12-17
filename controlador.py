@@ -27,7 +27,7 @@ def main():
     combo_ritmo = 0
     max_combo = 0
     fallos_ritmo = 0
-    MAX_FALLOS_RITMO = 3
+    MAX_FALLOS_RITMO = 100
 
     puntos_minimos = 30
     mensaje_temporal = ""
